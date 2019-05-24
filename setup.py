@@ -8,9 +8,9 @@ setup(name='D3MFairnessPrimitives',
                       ],
     entry_points = {
         'd3m.primitives': [
-            'data_preprocessing.data_conversion.FairnessPreProcessing = FairnessPrimitives:pre_processing',
-            'data_augmentation.data_conversion.FairnessInProcessing = FairnessPrimitives:in_processing',
-            'data_augmentation.data_conversion.FairnessPostProcessing = FairnessPrimitives:post_processing',
+            'data_preprocessing.data_conversion.FairnessPreProcessing = D3MFairnessPrimitives:pre_processing',
+            'data_augmentation.data_conversion.FairnessInProcessing = D3MFairnessPrimitives:in_processing',
+            'data_augmentation.data_conversion.FairnessPostProcessing = D3MFairnessPrimitives:post_processing',
        ],
     },
 )
