@@ -137,7 +137,7 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
 
         # save index and metadata
-        idx = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrimaryKey')[0]
+        idx = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrimaryKey')
         idx = [list(inputs)[i] for i in idx]
         index = inputs[idx]
 
@@ -178,7 +178,8 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
             transformed_dataset = algorithms.preprocessing.Reweighing(unprivileged_groups = unprivileged_groups, privileged_groups = privileged_groups).fit_transform(ibm_dataset)
 
         # transform IBM dataset back to D3M dataset
-        df = d3m_DataFrame(pandas.concat([index.reset_index(drop=True), transformed_dataset.convert_to_dataframe()[0].reset_index(drop=True)], axis = 1))
+        df = transformed_dataset.convert_to_dataframe()[0].drop(columns = label_names)
+        df = d3m_DataFrame(pandas.concat([index.reset_index(drop=True), inputs[label_names].reset_index(drop = True), df.reset_index(drop=True)], axis = 1))
         print(df.sex.value_counts(), file=sys.__stdout__)
         print(df.head(), file=sys.__stdout__)
         df.metadata = inputs.metadata
