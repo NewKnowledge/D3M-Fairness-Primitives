@@ -156,16 +156,16 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         if self.hyperparams['algorithm'] == 'Disparate_Impact_Remover':
             transformed_dataset = algorithms.preprocessing.DisparateImpactRemover().fit_transform(ibm_dataset)
         elif self.hyperparams['algorithm'] == 'Learning_Fair_Representations':
-            transformed_dataset = algorithms.preprocessing.LFR(unprivileged_groups = ({protected_attributes[0]: ibm_dataset.privileged_protected_attributes}),
-                                                                privileged_groups = ({protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes})).fit_transform(ibm_dataset)
+            transformed_dataset = algorithms.preprocessing.LFR(unprivileged_groups = [{protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}],
+                                                                privileged_groups = [{protected_attributes[0]: ibm_dataset.privileged_protected_attributes}]).fit_transform(ibm_dataset)
         elif self.hyperparams['algorithm'] == 'Optimized_Preprocessing':
-            transformed_dataset = algorithms.preprocessing.OptimPreproc(unprivileged_groups = ({protected_attributes[0]: ibm_dataset.privileged_protected_attributes}),
-                                                                privileged_groups = ({protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}),
+            transformed_dataset = algorithms.preprocessing.OptimPreproc(unprivileged_groups = [{protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}],
+                                                                privileged_groups = [{protected_attributes[0]: ibm_dataset.privileged_protected_attributes}],
                                                                 optimizer = algorithms.preprocessing.optim_preproc_helpers.opt_tools.OptTools,
                                                                 optim_options = {}).fit_transform(ibm_dataset)
         else: 
-            privileged_groups = {p_attr: p_attr_val for (p_attr, p_attr_val) in zip(protected_attributes, ibm_dataset.privileged_protected_attributes)}
-            unprivileged_groups = {p_attr: p_attr_val for (p_attr, p_attr_val) in zip(protected_attributes, ibm_dataset.unprivileged_protected_attributes)}
+            privileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(protected_attributes, ibm_dataset.privileged_protected_attributes)]
+            unprivileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(protected_attributes, ibm_dataset.unprivileged_protected_attributes)]
             transformed_dataset = algorithms.preprocessing.Reweighing(unprivileged_groups = unprivileged_groups, privileged_groups = privileged_groups).fit_transform(ibm_dataset)
 
         # transform IBM dataset back to D3M dataset
