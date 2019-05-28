@@ -111,11 +111,6 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         inputs : features
         outputs : labels
         '''
-
-        # confirm that length of protected_attribute_cols HP and privileged_protected_attributes HP are the same
-        if len(self.hyperparams['protected_attribute_cols']) != len(self.hyperparams['privileged_protected_attributes']):
-            raise exceptions.InvalidArgumentValueError("The number of protected attributes and the number of lists of privileged values for these + \
-                                                       protected attributes must be the same")
                                                 
         # only select attributes from training data
         self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
