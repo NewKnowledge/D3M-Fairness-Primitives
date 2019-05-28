@@ -1,19 +1,14 @@
 import sys
 import os.path
-import numpy as np
 import pandas
-import typing
 from typing import List
 
-from Sloth import cluster
-
-from d3m.primitive_interfaces.transformer import PrimitiveBase
-from d3m.primitive_interfaces.base import CallResult
+from d3m.primitive_interfaces.base import CallResult, PrimitiveBase
 
 from d3m import container, utils, exceptions
 from d3m.container import DataFrame as d3m_DataFrame
 from d3m.metadata import hyperparams, base as metadata_base, params
-from common_primitives import utils as utils_cp, dataset_to_dataframe as DatasetToDataFrame
+from common_primitives import random_forest
 
 from aif360 import datasets, algorithms
 from aif360.algorithms import preprocessing
@@ -108,11 +103,8 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         super().__init__(hyperparams=hyperparams, random_seed=random_seed)
 
         self.inputs = None
-        self.targets = None
-        self.label_names = None
-        self.protected_attributes = None
-        self.index = None
-        self.df_metadata = None
+        self.outputs = None
+        self.clf = None
 
     def get_params(self) -> Params:
         return self._params
@@ -122,48 +114,37 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
 
     def set_training_data(self, *, inputs: Inputs, outputs: Outputs) -> None:
         '''
-        Sets primitive's training data
+        Sets primitive's training data by applying pre-processing algorithm
+
         Parameters
         ----------
-        inputs: d3m dataframe
-        outputs: d3m dataframe
+        inputs : features
+        outputs : labels
         '''
-
+        print('setting training data', file = sys.__stout__)
+        # confirm that length of protected_attribute_cols HP and privileged_protected_attributes HP are the same
+        if len(self.hyperparams['protected_attribute_cols']) != len(self.hyperparams['privileged_protected_attributes']):
+            raise exceptions.InvalidArgumentValueError("The number of protected attributes and the number of lists of privileged values for these + \
+                                                       protected attributes must be the same")
+                                                
         # only select attributes from training data
         targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
         if not len(targets):
             targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
         if not len(targets):
             targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/SuggestedTarget')
-        self.label_names = [list(inputs)[t] for t in targets]
-        self.protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
+        label_names = [list(inputs)[t] for t in targets]
+        protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
+
+        # save index and metadata
+        index = inputs.d3mIndex
+        df_metadata = inputs.metadata
 
         # select only attributes and targets from training data
         attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
-        attribute_names = [list(inputs)[a] for a in attributes + targets]
-        self.inputs = inputs[attribute_names]
+        attribute_names = [list(inputs)[a] for a in attributes]
+        inputs = inputs[attribute_names + label_names]
 
-        # save d3m index and metadata
-        self.index = inputs.d3mIndex
-        self.df_metadata = inputs.metadata
-
-    def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
-        """
-        Parameters
-        ----------
-        inputs : D3M dataframe
-
-        Returns
-        ----------
-        Outputs : D3M dataframe with a new number of edited records after one of four fairness pre-processing algorithms 
-            have been applied to the dataset
-        """
-
-        # confirm that length of protected_attribute_cols HP and privileged_protected_attributes HP are the same
-        if len(self.hyperparams['protected_attribute_cols']) != len(self.hyperparams['privileged_protected_attributes']):
-            raise exceptions.InvalidArgumentValueError("The number of protected attributes and the number of lists of privileged values for these + \
-                                                       protected attributes must be the same")
-        
         # transfrom dataframe to IBM 360 compliant dataset
             # 1. assume datacleaning primitive has been applied so there are no NAs
             # 2. assume PandasOneHotEncoderPrimitive has also been applied to categorical columns
@@ -177,41 +158,65 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
 
         # apply pre-processing algorithm
         if self.hyperparams['algorithm'] == 'Disparate_Impact_Remover':
-            transformed_dataset = algorithms.preprocessing.DisparateImpactRemover().fit_transform(ibm_dataset)
+            transformed_dataset = algorithms.preprocessing.DisparateImpactRemover(repair_level = 0.5).fit_transform(ibm_dataset)
         elif self.hyperparams['algorithm'] == 'Learning_Fair_Representations':
-            unprivileged_protected_attributes = list(set(self.inputs[protected_attributes[0]].unique()) - set(self.hyperparams['privileged_protected_attributes']))
+            unprivileged_protected_attributes = list(set(inputs[protected_attributes[0]].unique()) - set(self.hyperparams['privileged_protected_attributes']))
             transformed_dataset = algorithms.preprocessing.LFR(unprivileged_groups = ({protected_attributes[0]: self.hyperparams['privileged_protected_attributes']}),
                                                                 privileged_groups = ({protected_attributes[0]: unprivileged_protected_attributes})).fit_transform(ibm_dataset)
         elif self.hyperparams['algorithm'] == 'Optimized_Preprocessing':
-            unprivileged_protected_attributes = list(set(self.inputs[protected_attributes[0]].unique()) - set(self.hyperparams['privileged_protected_attributes']))
+            unprivileged_protected_attributes = list(set(inputs[protected_attributes[0]].unique()) - set(self.hyperparams['privileged_protected_attributes']))
             transformed_dataset = algorithms.preprocessing.OptimPreproc(unprivileged_groups = ({protected_attributes[0]: self.hyperparams['privileged_protected_attributes']}),
                                                                 privileged_groups = ({protected_attributes[0]: unprivileged_protected_attributes}),
                                                                 optimizer = algorithms.preprocessing.optim_preproc_helpers.opt_tools.OptTools,
                                                                 optim_options = {}).fit_transform(ibm_dataset)
         else: 
-            unprivileged_protected_attributes = list([set(self.inputs[p_attr].unique()) - set(p_attr_val) \
+            unprivileged_protected_attributes = list([set(inputs[p_attr].unique()) - set(p_attr_val) \
                                 for p_attr, p_attr_val in zip(protected_attributes, self.hyperparams['privileged_protected_attributes'])])
             privileged_groups = {p_attr: p_attr_val for (p_attr, p_attr_val) in zip(protected_attributes, self.hyperparams['privileged_protected_attributes'])}
             unprivileged_groups = {p_attr: p_attr_val for (p_attr, p_attr_val) in zip(protected_attributes, unprivileged_protected_attributes)}
             transformed_dataset = algorithms.preprocessing.Reweighing(unprivileged_groups = unprivileged_groups, privileged_groups = privileged_groups).fit_transform(ibm_dataset)
 
         # transform IBM dataset back to D3M dataset
-        df = d3m_DataFrame(pandas.concat([self.index, transformed_dataset.convert_to_dataframe()[0]], axis=1)
-        df.metadata = self.df_metadata
-        return CallResult(transformed_dataset.convert_to_dataframe()[0])
+        df = transformed_dataset.convert_to_dataframe()[0]
+        #df['d3mIndex'] = index.values
+        print(df.sex.value_counts(), file=sys.__stdout__)
+        print(df.head(), file=sys.__stdout__)
+        self.inputs = df[attribute_names]
+        self.outputs = df[label_names]
+        #df = d3m_DataFrame(df)
+        #df.metadata = df_metadata
+        #return CallResult(df)
 
-    def produce(self, *, inputs: Inputs, timeout: float = None, iterations: int = None) -> CallResult[Outputs]:
+    def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
         """
+        Fit primitive using sklearn random forest on pre-processed training data
+
         Parameters
         ----------
         inputs : D3M dataframe
 
         Returns
         ----------
-        Outputs : exact same D3M dataframe. Pre-processing algorithm not applied to test dataset
+        Outputs : D3M dataframe unchanged
+        """
+        
+        hp_class = random_forest.RandomForestClassifierPrimitive.metadata.query()['primitive_code']['class_type_arguments']['Hyperparams'] 
+        self.clf = random_forest.RandomForestClassifierPrimitive(hyperparams=hyperparams_class.defaults())
+        self.clf.set_training_data(inputs = self.inputs, outputs = self.outputs)
+        self.clf.fit()
+
+    def produce(self, *, inputs: Inputs, timeout: float = None, iterations: int = None) -> CallResult[Outputs]:
+        """
+        Produce predictions using sklearn random forest 
+
+        Parameters
+        ----------
+        inputs : D3M dataframe
+
+        Returns
+        ----------
+        Outputs : predictions from sklearn random forest which was fit on pre-processed training data
             
         """
-
-        # pass dataframe through unchanged
-        return CallResult(inputs)
+        self.clf.produce(inputs = inputs)
 

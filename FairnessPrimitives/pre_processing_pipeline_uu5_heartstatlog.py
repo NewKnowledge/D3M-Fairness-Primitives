@@ -50,24 +50,15 @@ step_5.add_hyperparameter(name='privileged_protected_attributes', argument_type=
 step_5.add_hyperparameter(name='favorable_label', argument_type=ArgumentType.VALUE,data=0.)
 pipeline_description.add_step(step_5)
 
-# Step 6: random_forest
-step_6 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.classification.svc.SKlearn'))
+# Step 7: construct output
+step_6 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_transformation.construct_predictions.DataFrameCommon'))
 step_6.add_argument(name='inputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.5.produce')
-step_6.add_argument(name='outputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.5.produce')
+step_6.add_argument(name='reference', argument_type=ArgumentType.CONTAINER, data_reference='steps.1.produce')
 step_6.add_output('produce')
-step_6.add_hyperparameter(name='add_index_columns', argument_type=ArgumentType.VALUE,data=True)
-step_6.add_hyperparameter(name='use_semantic_types', argument_type=ArgumentType.VALUE,data=True)
 pipeline_description.add_step(step_6)
 
-# Step 7: construct output
-step_7 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_transformation.construct_predictions.DataFrameCommon'))
-step_7.add_argument(name='inputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.6.produce')
-step_7.add_argument(name='reference', argument_type=ArgumentType.CONTAINER, data_reference='steps.1.produce')
-step_7.add_output('produce')
-pipeline_description.add_step(step_7)
-
 # Final Output
-pipeline_description.add_output(name='output predictions', data_reference='steps.7.produce')
+pipeline_description.add_output(name='output predictions', data_reference='steps.6.produce')
 
 # Output to JSON
 with open('pipeline.json', 'w') as outfile:
