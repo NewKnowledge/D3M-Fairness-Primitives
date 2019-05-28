@@ -102,8 +102,9 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
     def __init__(self, *, hyperparams: Hyperparams, random_seed: int = 0)-> None:
         super().__init__(hyperparams=hyperparams, random_seed=random_seed)
 
-        self.inputs = None
-        self.outputs = None
+        self.attributes = None
+        self.targets = None
+        self.values = None
         self.clf = None
 
     def get_params(self) -> Params:
@@ -128,12 +129,12 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
                                                        protected attributes must be the same")
                                                 
         # only select attributes from training data
-        targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
+        self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
         if not len(targets):
-            targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
+            self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
         if not len(targets):
-            targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/SuggestedTarget')
-        label_names = [list(inputs)[t] for t in targets]
+            self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/SuggestedTarget')
+        label_names = [list(inputs)[t] for t in self.targets]
         protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
 
         # save index and metadata
@@ -142,8 +143,8 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         index = inputs[idx]
 
         # drop index from training data
-        attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
-        attribute_names = [list(inputs)[a] for a in attributes]
+        self.attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
+        attribute_names = [list(inputs)[a] for a in self.attributes]
         inputs = inputs.drop(columns=idx)
 
         # transfrom dataframe to IBM 360 compliant dataset
@@ -183,8 +184,7 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         print(df.sex.value_counts(), file=sys.__stdout__)
         print(df.head(), file=sys.__stdout__)
         df.metadata = inputs.metadata
-        self.inputs = df[attribute_names]
-        self.outputs = df[label_names]
+        self.values = df
 
     def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
         """
@@ -200,7 +200,8 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         """
         
         hp_class = random_forest.RandomForestClassifierPrimitive.metadata.query()['primitive_code']['class_type_arguments']['Hyperparams'] 
-        self.clf = random_forest.RandomForestClassifierPrimitive(hyperparams=hp_class.defaults())
+        hp=hp_class.defaults().replace({'use_inputs_columns': self.attributes, 'use_outputs_columns': self.targets})
+        self.clf = random_forest.RandomForestClassifierPrimitive(hyperparams=hp)
         self.clf.set_training_data(inputs = self.inputs, outputs = self.outputs)
         self.clf.fit()
 
