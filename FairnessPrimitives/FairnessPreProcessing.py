@@ -26,6 +26,9 @@ __contact__ = 'mailto:nklabs@newknowledge.com'
 Inputs = container.pandas.DataFrame
 Outputs = container.pandas.DataFrame
 
+class Params(params.Params):
+    pass
+
 class Hyperparams(hyperparams.Hyperparams):
     algorithm = hyperparams.Enumeration(default = 'Disparate_Impact_Remover', 
         semantic_types = ['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
@@ -106,6 +109,10 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
 
         self.inputs = None
         self.targets = None
+        self.label_names = None
+        self.protected_attributes = None
+        self.index = None
+        self.df_metadata = None
 
     def get_params(self) -> Params:
         return self._params
@@ -123,15 +130,22 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         '''
 
         # only select attributes from training data
-        attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
-        attribute_names = [list(inputs)[a] for a in attributes]
-        self.inputs = inputs[[attribute_names]]
         targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
         if not len(targets):
-            targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')  
+            targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
         if not len(targets):
             targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/SuggestedTarget')
-        self.targets = targets
+        self.label_names = [list(inputs)[t] for t in targets]
+        self.protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
+
+        # select only attributes and targets from training data
+        attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
+        attribute_names = [list(inputs)[a] for a in attributes + targets]
+        self.inputs = inputs[attribute_names]
+
+        # save d3m index and metadata
+        self.index = inputs.d3mIndex
+        self.df_metadata = inputs.metadata
 
     def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
         """
@@ -146,21 +160,19 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         """
 
         # confirm that length of protected_attribute_cols HP and privileged_protected_attributes HP are the same
-        if len(self.hyperparams['protected_attribute_cols']) != len(self.hyperparams['privileged_protected_attributes'])
+        if len(self.hyperparams['protected_attribute_cols']) != len(self.hyperparams['privileged_protected_attributes']):
             raise exceptions.InvalidArgumentValueError("The number of protected attributes and the number of lists of privileged values for these + \
                                                        protected attributes must be the same")
         
         # transfrom dataframe to IBM 360 compliant dataset
             # 1. assume datacleaning primitive has been applied so there are no NAs
             # 2. assume PandasOneHotEncoderPrimitive has also been applied to categorical columns
-        label_names = [list(self.inputs)[target] for target in self.targets]
-        protected_attributes = [list(self.inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
         unfavorable_label = 0. if self.hyperparams['favorable_label'] == 1. else 1.
-        ibm_dataset = datasets.BinaryLabelDataset(df = self.inputs, 
-                                                label_names = label_names, 
-                                                protected_attribute_names = protected_attributes, 
+        ibm_dataset = datasets.BinaryLabelDataset(df = self.inputs,
+                                                label_names = self.label_names,
+                                                protected_attribute_names = self.protected_attributes,
                                                 privileged_protected_attributes = self.hyperparams['privileged_protected_attributes'],
-                                                favorable_label=self.hyperparams['favorable_label'], 
+                                                favorable_label=self.hyperparams['favorable_label'],
                                                 unfavorable_label=unfavorable_label)
 
         # apply pre-processing algorithm
@@ -184,6 +196,8 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
             transformed_dataset = algorithms.preprocessing.Reweighing(unprivileged_groups = unprivileged_groups, privileged_groups = privileged_groups).fit_transform(ibm_dataset)
 
         # transform IBM dataset back to D3M dataset
+        df = d3m_DataFrame(pandas.concat([self.index, transformed_dataset.convert_to_dataframe()[0]], axis=1)
+        df.metadata = self.df_metadata
         return CallResult(transformed_dataset.convert_to_dataframe()[0])
 
     def produce(self, *, inputs: Inputs, timeout: float = None, iterations: int = None) -> CallResult[Outputs]:
