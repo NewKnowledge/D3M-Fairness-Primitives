@@ -35,17 +35,6 @@ class Hyperparams(hyperparams.Hyperparams):
         semantic_types=['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
         description="A set of column indices to use as protected attributes.",
     )
-    privileged_protected_attributes = hyperparams.List(
-        elements=hyperparams.List(
-            elements=hyperparams.Hyperparameter[int](-1),
-            default=(),
-            semantic_types=['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
-            description="One subset of protected attribute values which are considered privileged from a fairness perspective",
-        ),
-        default=[],
-        semantic_types=['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
-        description= "A list of subsets of protected attribute values which are considered privileged from a fairness perspective",
-    )
     favorable_label = hyperparams.Bounded[float](
         lower=0.,
         upper=1., 
@@ -135,13 +124,14 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         if not len(self.targets):
             self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/SuggestedTarget')
         label_names = [list(inputs)[t] for t in self.targets]
+        
+        # calculate protected attributes and privel=
         protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
 
         # save index and metadata
         idx = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrimaryKey')
         idx = [list(inputs)[i] for i in idx]
         index = inputs[idx]
-        metadata = inputs.metadata
         
         # mark attributes that are not priveleged data
         attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
@@ -159,28 +149,23 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         ibm_dataset = datasets.BinaryLabelDataset(df = inputs,
                                                 label_names = label_names,
                                                 protected_attribute_names = protected_attributes,
-                                                privileged_protected_attributes = self.hyperparams['privileged_protected_attributes'],
                                                 favorable_label=self.hyperparams['favorable_label'],
                                                 unfavorable_label=unfavorable_label)
 
         # apply pre-processing algorithm
         if self.hyperparams['algorithm'] == 'Disparate_Impact_Remover':
-            transformed_dataset = algorithms.preprocessing.DisparateImpactRemover(repair_level = 0.5).fit_transform(ibm_dataset)
+            transformed_dataset = algorithms.preprocessing.DisparateImpactRemover().fit_transform(ibm_dataset)
         elif self.hyperparams['algorithm'] == 'Learning_Fair_Representations':
-            unprivileged_protected_attributes = list(set(inputs[protected_attributes[0]].unique()) - set(self.hyperparams['privileged_protected_attributes']))
-            transformed_dataset = algorithms.preprocessing.LFR(unprivileged_groups = ({protected_attributes[0]: self.hyperparams['privileged_protected_attributes']}),
-                                                                privileged_groups = ({protected_attributes[0]: unprivileged_protected_attributes})).fit_transform(ibm_dataset)
+            transformed_dataset = algorithms.preprocessing.LFR(unprivileged_groups = ({protected_attributes[0]: ibm_dataset.privileged_protected_attributes}),
+                                                                privileged_groups = ({protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes})).fit_transform(ibm_dataset)
         elif self.hyperparams['algorithm'] == 'Optimized_Preprocessing':
-            unprivileged_protected_attributes = list(set(inputs[protected_attributes[0]].unique()) - set(self.hyperparams['privileged_protected_attributes']))
-            transformed_dataset = algorithms.preprocessing.OptimPreproc(unprivileged_groups = ({protected_attributes[0]: self.hyperparams['privileged_protected_attributes']}),
-                                                                privileged_groups = ({protected_attributes[0]: unprivileged_protected_attributes}),
+            transformed_dataset = algorithms.preprocessing.OptimPreproc(unprivileged_groups = ({protected_attributes[0]: ibm_dataset.privileged_protected_attributes}),
+                                                                privileged_groups = ({protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}),
                                                                 optimizer = algorithms.preprocessing.optim_preproc_helpers.opt_tools.OptTools,
                                                                 optim_options = {}).fit_transform(ibm_dataset)
         else: 
-            unprivileged_protected_attributes = list([set(inputs[p_attr].unique()) - set(p_attr_val) \
-                                for p_attr, p_attr_val in zip(protected_attributes, self.hyperparams['privileged_protected_attributes'])])
-            privileged_groups = {p_attr: p_attr_val for (p_attr, p_attr_val) in zip(protected_attributes, self.hyperparams['privileged_protected_attributes'])}
-            unprivileged_groups = {p_attr: p_attr_val for (p_attr, p_attr_val) in zip(protected_attributes, unprivileged_protected_attributes)}
+            privileged_groups = {p_attr: p_attr_val for (p_attr, p_attr_val) in zip(protected_attributes, ibm_dataset.privileged_protected_attributes)}
+            unprivileged_groups = {p_attr: p_attr_val for (p_attr, p_attr_val) in zip(protected_attributes, ibm_dataset.unprivileged_protected_attributes)}
             transformed_dataset = algorithms.preprocessing.Reweighing(unprivileged_groups = unprivileged_groups, privileged_groups = privileged_groups).fit_transform(ibm_dataset)
 
         # transform IBM dataset back to D3M dataset
