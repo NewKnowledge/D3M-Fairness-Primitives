@@ -202,7 +202,7 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         hp_class = random_forest.RandomForestClassifierPrimitive.metadata.query()['primitive_code']['class_type_arguments']['Hyperparams'] 
         hp=hp_class.defaults().replace({'use_inputs_columns': self.attributes, 'use_outputs_columns': self.targets})
         self.clf = random_forest.RandomForestClassifierPrimitive(hyperparams=hp)
-        self.clf.set_training_data(inputs = self.inputs, outputs = self.outputs)
+        self.clf.set_training_data(inputs = self.values, outputs = self.values)
         self.clf.fit()
 
     def produce(self, *, inputs: Inputs, timeout: float = None, iterations: int = None) -> CallResult[Outputs]:
