@@ -121,7 +121,7 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         inputs : features
         outputs : labels
         '''
-        print('setting training data', file = sys.__stout__)
+        print('setting training data', file = sys.__stdout__)
         # confirm that length of protected_attribute_cols HP and privileged_protected_attributes HP are the same
         if len(self.hyperparams['protected_attribute_cols']) != len(self.hyperparams['privileged_protected_attributes']):
             raise exceptions.InvalidArgumentValueError("The number of protected attributes and the number of lists of privileged values for these + \
