@@ -137,7 +137,7 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
 
         # save index and metadata
-        index = inputs.d3mIndex
+        #index = inputs.d3mIndex
         df_metadata = inputs.metadata
 
         # select only attributes and targets from training data
@@ -149,9 +149,9 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
             # 1. assume datacleaning primitive has been applied so there are no NAs
             # 2. assume PandasOneHotEncoderPrimitive has also been applied to categorical columns
         unfavorable_label = 0. if self.hyperparams['favorable_label'] == 1. else 1.
-        ibm_dataset = datasets.BinaryLabelDataset(df = self.inputs,
-                                                label_names = self.label_names,
-                                                protected_attribute_names = self.protected_attributes,
+        ibm_dataset = datasets.BinaryLabelDataset(df = inputs,
+                                                label_names = label_names,
+                                                protected_attribute_names = protected_attributes,
                                                 privileged_protected_attributes = self.hyperparams['privileged_protected_attributes'],
                                                 favorable_label=self.hyperparams['favorable_label'],
                                                 unfavorable_label=unfavorable_label)
@@ -181,6 +181,8 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         #df['d3mIndex'] = index.values
         print(df.sex.value_counts(), file=sys.__stdout__)
         print(df.head(), file=sys.__stdout__)
+        df = d3m_DataFrame(df)
+        df.metadata = df_metadata
         self.inputs = df[attribute_names]
         self.outputs = df[label_names]
         #df = d3m_DataFrame(df)
@@ -201,7 +203,7 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         """
         
         hp_class = random_forest.RandomForestClassifierPrimitive.metadata.query()['primitive_code']['class_type_arguments']['Hyperparams'] 
-        self.clf = random_forest.RandomForestClassifierPrimitive(hyperparams=hyperparams_class.defaults())
+        self.clf = random_forest.RandomForestClassifierPrimitive(hyperparams=hp_class.defaults())
         self.clf.set_training_data(inputs = self.inputs, outputs = self.outputs)
         self.clf.fit()
 
