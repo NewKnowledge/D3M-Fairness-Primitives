@@ -137,13 +137,14 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
 
         # save index and metadata
-        #index = inputs.d3mIndex
-        df_metadata = inputs.metadata
+        idx = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrimaryKey')[0]
+        idx = [list(inputs)[i] for i in idx]
+        index = inputs[idx]
 
-        # select only attributes and targets from training data
+        # drop index from training data
         attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
         attribute_names = [list(inputs)[a] for a in attributes]
-        inputs = inputs[attribute_names + label_names]
+        inputs = inputs.drop(columns=idx)
 
         # transfrom dataframe to IBM 360 compliant dataset
             # 1. assume datacleaning primitive has been applied so there are no NAs
@@ -177,17 +178,12 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
             transformed_dataset = algorithms.preprocessing.Reweighing(unprivileged_groups = unprivileged_groups, privileged_groups = privileged_groups).fit_transform(ibm_dataset)
 
         # transform IBM dataset back to D3M dataset
-        df = transformed_dataset.convert_to_dataframe()[0]
-        #df['d3mIndex'] = index.values
+        df = d3m_DataFrame(pandas.concat([index.reset_index(drop=True), transformed_dataset.convert_to_dataframe()[0].reset_index(drop=True)], axis = 1))
         print(df.sex.value_counts(), file=sys.__stdout__)
         print(df.head(), file=sys.__stdout__)
-        df = d3m_DataFrame(df)
-        df.metadata = df_metadata
+        df.metadata = inputs.metadata
         self.inputs = df[attribute_names]
         self.outputs = df[label_names]
-        #df = d3m_DataFrame(df)
-        #df.metadata = df_metadata
-        #return CallResult(df)
 
     def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
         """
