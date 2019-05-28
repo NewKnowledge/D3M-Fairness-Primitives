@@ -122,7 +122,7 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         inputs : features
         outputs : labels
         '''
-        print('setting training data', file = sys.__stdout__)
+
         # confirm that length of protected_attribute_cols HP and privileged_protected_attributes HP are the same
         if len(self.hyperparams['protected_attribute_cols']) != len(self.hyperparams['privileged_protected_attributes']):
             raise exceptions.InvalidArgumentValueError("The number of protected attributes and the number of lists of privileged values for these + \
@@ -130,9 +130,9 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
                                                 
         # only select attributes from training data
         self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
-        if not len(targets):
+        if not len(self.targets):
             self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
-        if not len(targets):
+        if not len(self.targets):
             self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/SuggestedTarget')
         label_names = [list(inputs)[t] for t in self.targets]
         protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
@@ -141,10 +141,15 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         idx = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrimaryKey')
         idx = [list(inputs)[i] for i in idx]
         index = inputs[idx]
-
-        # drop index from training data
-        self.attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
+        metadata = inputs.metadata
+        
+        # mark attributes that are not priveleged data
+        attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
+        priveleged_data = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrivilegedData')
+        self.attributes = list(set(attributes) - set(priveleged_data))
         attribute_names = [list(inputs)[a] for a in self.attributes]
+        
+        # drop index from training data
         inputs = inputs.drop(columns=idx)
 
         # transfrom dataframe to IBM 360 compliant dataset
@@ -203,7 +208,7 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         hp=hp_class.defaults().replace({'use_inputs_columns': self.attributes, 'use_outputs_columns': self.targets})
         self.clf = random_forest.RandomForestClassifierPrimitive(hyperparams=hp)
         self.clf.set_training_data(inputs = self.values, outputs = self.values)
-        self.clf.fit()
+        return self.clf.fit()
 
     def produce(self, *, inputs: Inputs, timeout: float = None, iterations: int = None) -> CallResult[Outputs]:
         """
@@ -218,5 +223,5 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         Outputs : predictions from sklearn random forest which was fit on pre-processed training data
             
         """
-        self.clf.produce(inputs = inputs)
+        return self.clf.produce(inputs = inputs)
 
