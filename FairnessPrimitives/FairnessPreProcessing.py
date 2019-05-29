@@ -12,7 +12,6 @@ from common_primitives import random_forest
 
 from aif360 import datasets, algorithms
 from aif360.algorithms import preprocessing
-from aif360.algorithms.preprocessing.optim_preproc_helpers import opt_tools
 
 __author__ = 'Distil'
 __version__ = '1.0.0'
@@ -27,7 +26,7 @@ class Params(params.Params):
 class Hyperparams(hyperparams.Hyperparams):
     algorithm = hyperparams.Enumeration(default = 'Disparate_Impact_Remover', 
         semantic_types = ['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
-        values = ['Disparate_Impact_Remover', 'Learning_Fair_Representations', 'Optimized_Preprocessing', 'Reweighing'],
+        values = ['Disparate_Impact_Remover', 'Learning_Fair_Representations', 'Reweighing'],
         description = 'type of fairness pre-processing algorithm to use')
     protected_attribute_cols = hyperparams.List(
         elements=hyperparams.Hyperparameter[int](-1),
@@ -153,11 +152,6 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         elif self.hyperparams['algorithm'] == 'Learning_Fair_Representations':
             transformed_dataset = preprocessing.LFR(unprivileged_groups = [{protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}],
                                                                 privileged_groups = [{protected_attributes[0]: ibm_dataset.privileged_protected_attributes}]).fit_transform(ibm_dataset)
-        elif self.hyperparams['algorithm'] == 'Optimized_Preprocessing':
-            transformed_dataset = preprocessing.OptimPreproc(unprivileged_groups = [{protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}],
-                                                                privileged_groups = [{protected_attributes[0]: ibm_dataset.privileged_protected_attributes}],
-                                                                optimizer = opt_tools.OptTools,
-                                                                optim_options = {}).fit_transform(ibm_dataset)
         else: 
             privileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(protected_attributes, ibm_dataset.privileged_protected_attributes)]
             unprivileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(protected_attributes, ibm_dataset.unprivileged_protected_attributes)]
