@@ -12,7 +12,7 @@ from common_primitives import random_forest
 
 from aif360 import datasets, algorithms
 from aif360.algorithms import preprocessing
-from aif360.algorithms.preprocessing import optim_preproc_helpers
+from aif360.algorithms.preprocessing.optim_preproc_helpers import opt_tools
 
 __author__ = 'Distil'
 __version__ = '1.0.0'
@@ -149,25 +149,24 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
 
         # apply pre-processing algorithm
         if self.hyperparams['algorithm'] == 'Disparate_Impact_Remover':
-            transformed_dataset = algorithms.preprocessing.DisparateImpactRemover().fit_transform(ibm_dataset)
+            transformed_dataset = preprocessing.DisparateImpactRemover().fit_transform(ibm_dataset)
         elif self.hyperparams['algorithm'] == 'Learning_Fair_Representations':
-            transformed_dataset = algorithms.preprocessing.LFR(unprivileged_groups = [{protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}],
+            transformed_dataset = preprocessing.LFR(unprivileged_groups = [{protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}],
                                                                 privileged_groups = [{protected_attributes[0]: ibm_dataset.privileged_protected_attributes}]).fit_transform(ibm_dataset)
         elif self.hyperparams['algorithm'] == 'Optimized_Preprocessing':
-            transformed_dataset = algorithms.preprocessing.OptimPreproc(unprivileged_groups = [{protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}],
+            transformed_dataset = preprocessing.OptimPreproc(unprivileged_groups = [{protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}],
                                                                 privileged_groups = [{protected_attributes[0]: ibm_dataset.privileged_protected_attributes}],
-                                                                optimizer = algorithms.preprocessing.optim_preproc_helpers.opt_tools.OptTools,
+                                                                optimizer = opt_tools.OptTools,
                                                                 optim_options = {}).fit_transform(ibm_dataset)
         else: 
             privileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(protected_attributes, ibm_dataset.privileged_protected_attributes)]
             unprivileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(protected_attributes, ibm_dataset.unprivileged_protected_attributes)]
-            transformed_dataset = algorithms.preprocessing.Reweighing(unprivileged_groups = unprivileged_groups, privileged_groups = privileged_groups).fit_transform(ibm_dataset)
+            transformed_dataset = preprocessing.Reweighing(unprivileged_groups = unprivileged_groups, privileged_groups = privileged_groups).fit_transform(ibm_dataset)
+            # TODO: incorporate instance weights fro transformed_dataset.instance_weights into classifier
 
         # transform IBM dataset back to D3M dataset
         df = transformed_dataset.convert_to_dataframe()[0].drop(columns = label_names)
         df = d3m_DataFrame(pandas.concat([index.reset_index(drop=True), inputs[label_names].reset_index(drop = True), df.reset_index(drop=True)], axis = 1))
-        print(df.sex.value_counts(), file=sys.__stdout__)
-        print(df.head(), file=sys.__stdout__)
         df.metadata = inputs.metadata
         self.values = df
 
