@@ -5,6 +5,9 @@ setup(name='FairnessPrimitives',
     description='Pre-processing, in-processing, and post-processing algorithms wrapped for the D3M infrastructure',
     packages=['FairnessPrimitives'],
     install_requires=["aif360",
+                    "numba",
+                    "BlackBoxAuditing",
+                    "cvxpy"
                       ],
     entry_points = {
         'd3m.primitives': [
