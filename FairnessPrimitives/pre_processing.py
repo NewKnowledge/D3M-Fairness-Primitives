@@ -38,15 +38,15 @@ class Hyperparams(hyperparams.Hyperparams):
         lower=0.,
         upper=1., 
         default=1.,
-        description='label value which is considered favorable (i.e. positive)',
+        description='label value which is considered favorable (i.e. positive) in the binary label case',
         semantic_types=['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
     )
     pass
 
 class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
     '''
-        Primitive that applies one of four pre-processing algorithm to training data before fitting step of pipeline. Algorithm
-        options are 'Disparate_Impact_Remover', 'Learning_Fair_Representations', 'Optimized_Preprocessing', and 'Reweighing'.
+        Primitive that applies one of three pre-processing algorithm to training data before fitting a learning algorithm. Algorithm
+        options are 'Disparate_Impact_Remover', 'Learning_Fair_Representations', and 'Reweighing'.
 
         Fit method applies primitive pre-processing. Produce method leaves dataset as is. 
 
@@ -138,7 +138,8 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
 
         # transfrom dataframe to IBM 360 compliant dataset
             # 1. assume datacleaning primitive has been applied so there are no NAs
-            # 2. assume PandasOneHotEncoderPrimitive has also been applied to categorical columns
+            # 2. assume categorical columns have been converted to unique numeric values
+            # 3. assume the label column is numeric 
         unfavorable_label = 0. if self.hyperparams['favorable_label'] == 1. else 1.
         ibm_dataset = datasets.BinaryLabelDataset(df = inputs,
                                                 label_names = label_names,
