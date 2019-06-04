@@ -47,9 +47,6 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
     '''
         Primitive that applies one of three pre-processing algorithm to training data before fitting a learning algorithm. Algorithm
         options are 'Disparate_Impact_Remover', 'Learning_Fair_Representations', and 'Reweighing'.
-
-        Fit method applies primitive pre-processing. Produce method leaves dataset as is. 
-
     '''
     metadata = metadata_base.PrimitiveMetadata({
         # Simply an UUID generated once and fixed forever. Generated using "uuid.uuid4()".
@@ -119,7 +116,7 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
             self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/SuggestedTarget')
         label_names = [list(inputs)[t] for t in self.targets]
         
-        # calculate protected attributes and privel=
+        # calculate protected attributes and priveleged data
         protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
 
         # save index and metadata
@@ -131,7 +128,6 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
         priveleged_data = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrivilegedData')
         self.attributes = list(set(attributes) - set(priveleged_data))
-        attribute_names = [list(inputs)[a] for a in self.attributes]
         
         # drop index from training data
         inputs = inputs.drop(columns=idx)
