@@ -40,7 +40,7 @@ step_4.add_hyperparameter(name='use_semantic_types', argument_type=ArgumentType.
 pipeline_description.add_step(step_4)
 
 # Step 5: Fairness in-processing Distil
-step_5 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_transformation.data_conversion.FairnessInProcessing''))
+step_5 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_augmentation.data_conversion.FairnessInProcessing'))
 step_5.add_argument(name='inputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.4.produce')
 step_5.add_argument(name='outputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.4.produce')
 step_5.add_output('produce')

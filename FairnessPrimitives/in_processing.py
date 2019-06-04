@@ -76,13 +76,13 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
              ),
         }],
         # The same path the primitive is registered with entry points in setup.py.
-        'python_path': 'd3m.primitives.data_transformation.data_conversion.FairnessInProcessing',
+        'python_path': 'd3m.primitives.data_augmentation.data_conversion.FairnessInProcessing',
         # Choose these from a controlled vocabulary in the schema. If anything is missing which would
         # best describe the primitive, make a merge request.
         'algorithm_types': [
             metadata_base.PrimitiveAlgorithmType.DATA_CONVERSION,
         ],
-        'primitive_family': metadata_base.PrimitiveFamily.DATA_TRANSFORMATION,
+        'primitive_family': metadata_base.PrimitiveFamily.DATA_AUGMENTATION,
     })
 
     def __init__(self, *, hyperparams: Hyperparams, random_seed: int = 0)-> None:
