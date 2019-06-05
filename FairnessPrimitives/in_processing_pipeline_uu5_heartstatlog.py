@@ -50,14 +50,14 @@ step_5.add_hyperparameter(name='favorable_label', argument_type=ArgumentType.VAL
 pipeline_description.add_step(step_5)
 
 # Step 7: construct output
-step_6 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_transformation.construct_predictions.DataFrameCommon'))
-step_6.add_argument(name='inputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.5.produce')
-step_6.add_argument(name='reference', argument_type=ArgumentType.CONTAINER, data_reference='steps.1.produce')
-step_6.add_output('produce')
-pipeline_description.add_step(step_6)
+#step_6 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_transformation.construct_predictions.DataFrameCommon'))
+#step_6.add_argument(name='inputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.5.produce')
+#step_6.add_argument(name='reference', argument_type=ArgumentType.CONTAINER, data_reference='steps.1.produce')
+#step_6.add_output('produce')
+#pipeline_description.add_step(step_6)
 
 # Final Output
-pipeline_description.add_output(name='output predictions', data_reference='steps.6.produce')
+pipeline_description.add_output(name='output predictions', data_reference='steps.5.produce')
 
 # Output to JSON
 with open('pipeline.json', 'w') as outfile:

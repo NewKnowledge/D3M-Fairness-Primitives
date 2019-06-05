@@ -91,7 +91,6 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
         self.label_names = None
         self.protected_attributes = None
         self.idx = None
-        self.index = None
         self.attribute_names = None
         self.unfavorable_label = None
         self.train_dataset = None
@@ -127,7 +126,6 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
         # save index and metadata
         idx = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrimaryKey')
         self.idx = [list(inputs)[i] for i in idx]
-        self.index = inputs[idx]
         
         # mark attributes that are not priveleged data
         attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
@@ -135,16 +133,13 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
         attributes = list(set(attributes) - set(priveleged_data))
         self.attribute_names = [list(inputs)[a] for a in attributes]
         
-        # drop index from training data
-        inputs = inputs.drop(columns=idx)
-
         # transfrom dataframe to IBM 360 compliant dataset
             # 1. assume datacleaning primitive has been applied so there are no NAs
             # 2. assume categorical columns have been converted to unique numeric values
             # 3. assume the label column is numeric 
         self.unfavorable_label = 0. if self.hyperparams['favorable_label'] == 1. else 1.
         if self.hyperparams['algorithm'] == 'Adversarial_Debiasing' or self.hyperparams['algorithm'] == 'Prejudice_Remover':
-            self.train_dataset = datasets.BinaryLabelDataset(df = inputs[self.attribute_names],
+            self.train_dataset = datasets.BinaryLabelDataset(df = inputs[self.attribute_names + self.label_names],
                                                     label_names = self.label_names,
                                                     protected_attribute_names = self.protected_attributes,
                                                     favorable_label=self.hyperparams['favorable_label'],
@@ -197,13 +192,10 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
         Outputs : predictions from sklearn random forest which was fit on pre-processed training data
             
         """
-        
-        # drop index from training data
-        inputs = inputs.drop(columns=self.idx)
-
         # transfrom test dataframe to IBM 360 compliant dataset
+        inputs[self.label_names] = self.train_dataset.convert_to_dataframe()[0][self.label_names].values[:inputs.shape[0]].astype(int)
         if self.hyperparams['algorithm'] == 'Adversarial_Debiasing' or self.hyperparams['algorithm'] == 'Prejudice_Remover':
-            test_dataset = datasets.BinaryLabelDataset(df = inputs[self.attribute_names],
+            test_dataset = datasets.BinaryLabelDataset(df = inputs[self.attribute_names + self.label_names],
                                                     label_names = self.label_names,
                                                     protected_attribute_names = self.protected_attributes,
                                                     favorable_label=self.hyperparams['favorable_label'],
@@ -212,12 +204,15 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
             test_dataset = datasets.Dataset(df = inputs[self.attribute_names],
                                             label_names = self.label_names,
                                             protected_attribute_names = self.protected_attributes)
-
-        transformed_dataset = self.clf.predict(inputs = test_dataset)
-
+        transformed_dataset = self.clf.predict(test_dataset)
+        
         # transform IBM dataset back to D3M dataset
-        df = transformed_dataset.convert_to_dataframe()[0].drop(columns = self.label_names)
-        df = d3m_DataFrame(pandas.concat([self.index.reset_index(drop=True), inputs[self.label_names].reset_index(drop = True), df.reset_index(drop=True)], axis = 1))
-        df.metadata = inputs.metadata
+        df = transformed_dataset.convert_to_dataframe()[0][self.label_names].astype(int)
+        df = d3m_DataFrame(pandas.concat([inputs[self.idx].reset_index(drop=True), df.reset_index(drop=True)], axis = 1))
+        print(inputs.metadata.query_column(0), file = sys.__stdout__)
+        print(inputs.metadata.query_column(1), file = sys.__stdout__)
+        df.metadata = df.metadata.update((metadata_base.ALL_ELEMENTS, 0), inputs.metadata.query_column(0))
+        df.metadata = df.metadata.update((metadata_base.ALL_ELEMENTS, 1), inputs.metadata.query_column(1))
+        print(df.head(), file = sys.__stdout__)
         return CallResult(df)
 
