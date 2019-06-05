@@ -12,6 +12,7 @@ from common_primitives import random_forest
 
 from aif360 import datasets, algorithms
 from aif360.algorithms import inprocessing
+from art.classifiers import Classifier
 import tensorflow as tf
 
 __author__ = 'Distil'
@@ -154,9 +155,8 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
             self.clf = inprocessing.AdversarialDebiasing(unprivileged_groups = [{self.protected_attributes[0]: self.train_dataset.unprivileged_protected_attributes}],
                                                                     privileged_groups = [{self.protected_attributes[0]: self.train_dataset.privileged_protected_attributes}],
                                                                     scope_name = 'adversarial_debiasing', sess = tf.Session())
-        # elif self.hyperparams['algorithm'] == 'ART_Classifier':
-        #     transformed_dataset = preprocessing.LFR(unprivileged_groups = [{protected_attributes[0]: self.train_dataset.unprivileged_protected_attributes}],
-        #                                             privileged_groups = [{protected_attributes[0]: self.train_dataset.privileged_protected_attributes}]).fit_transform(self.train_dataset)
+        elif self.hyperparams['algorithm'] == 'ART_Classifier':
+            self.clf = inprocessing.ARTClassifier(Classifier(0))
         # else: 
         #     privileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(protected_attributes, self.train_dataset.privileged_protected_attributes)]
         #     unprivileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(protected_attributes, self.train_dataset.unprivileged_protected_attributes)]
@@ -209,8 +209,6 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
         # transform IBM dataset back to D3M dataset
         df = transformed_dataset.convert_to_dataframe()[0][self.label_names].astype(int)
         df = d3m_DataFrame(pandas.concat([inputs[self.idx].reset_index(drop=True), df.reset_index(drop=True)], axis = 1))
-        print(inputs.metadata.query_column(0), file = sys.__stdout__)
-        print(inputs.metadata.query_column(1), file = sys.__stdout__)
         df.metadata = df.metadata.update((metadata_base.ALL_ELEMENTS, 0), inputs.metadata.query_column(0))
         df.metadata = df.metadata.update((metadata_base.ALL_ELEMENTS, 1), inputs.metadata.query_column(1))
         print(df.head(), file = sys.__stdout__)
