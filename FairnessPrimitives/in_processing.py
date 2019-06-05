@@ -149,13 +149,8 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
             self.clf = inprocessing.AdversarialDebiasing(unprivileged_groups = [{self.protected_attributes[0]: self.train_dataset.unprivileged_protected_attributes}],
                                                                     privileged_groups = [{self.protected_attributes[0]: self.train_dataset.privileged_protected_attributes}],
                                                                     scope_name = 'adversarial_debiasing', sess = tf.Session())
-        elif self.hyperparams['algorithm'] == 'ART_Classifier':
-            self.clf = inprocessing.ARTClassifier(Classifier(0))
-        # else: 
-        #     privileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(protected_attributes, self.train_dataset.privileged_protected_attributes)]
-        #     unprivileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(protected_attributes, self.train_dataset.unprivileged_protected_attributes)]
-        #     transformed_dataset = preprocessing.Reweighing(unprivileged_groups = unprivileged_groups, privileged_groups = privileged_groups).fit_transform(self.train_dataset)
-        #     # TODO: incorporate instance weights fro transformed_dataset.instance_weights into classifier
+        else:
+            self.clf = inprocessing.Prejudice_Remover()
 
     def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
         """
