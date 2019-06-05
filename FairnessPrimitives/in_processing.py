@@ -25,10 +25,6 @@ class Params(params.Params):
     pass
 
 class Hyperparams(hyperparams.Hyperparams):
-    algorithm = hyperparams.Enumeration(default = 'Adversarial_Debiasing', 
-        semantic_types = ['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
-        values = ['Adversarial_Debiasing', 'ART_Classifier', 'Prejudice_Remover'],
-        description = 'type of fairness pre-processing algorithm to use')
     protected_attribute_cols = hyperparams.List(
         elements=hyperparams.Hyperparameter[int](-1),
         default=[],
@@ -46,8 +42,9 @@ class Hyperparams(hyperparams.Hyperparams):
 
 class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
     '''
-        Primitive that applies one of three in-processing algorithm to training data while fitting a learning algorithm. Algorithm
-        options are 'Adversarial_Debiasing' and 'Prejudice_Remover'.
+        Primitive that applies an in-processing algorithm to training data while fitting a learning algorithm. Algorithm
+            is 'Adversarial_Debiasing', which earns a classifier to maximize prediction accuracy and simultaneously reduce
+            an adversary’s ability to determine the protected attribute from the predictions.
     '''
     metadata = metadata_base.PrimitiveMetadata({
         # Simply an UUID generated once and fixed forever. Generated using "uuid.uuid4()".
@@ -144,13 +141,10 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
                                                 favorable_label=self.hyperparams['favorable_label'],
                                                 unfavorable_label=self.unfavorable_label)
 
-        # apply pre-processing algorithm
-        if self.hyperparams['algorithm'] == 'Adversarial_Debiasing':
-            self.clf = inprocessing.AdversarialDebiasing(unprivileged_groups = [{self.protected_attributes[0]: self.train_dataset.unprivileged_protected_attributes}],
-                                                                    privileged_groups = [{self.protected_attributes[0]: self.train_dataset.privileged_protected_attributes}],
-                                                                    scope_name = 'adversarial_debiasing', sess = tf.Session())
-        else:
-            self.clf = inprocessing.Prejudice_Remover()
+        # apply in-processing algorithm
+        self.clf = inprocessing.AdversarialDebiasing(unprivileged_groups = [{self.protected_attributes[0]: self.train_dataset.unprivileged_protected_attributes}],
+                                                                privileged_groups = [{self.protected_attributes[0]: self.train_dataset.privileged_protected_attributes}],
+                                                                scope_name = 'adversarial_debiasing', sess = tf.Session())
 
     def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
         """
