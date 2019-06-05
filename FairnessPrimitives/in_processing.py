@@ -12,7 +12,6 @@ from common_primitives import random_forest
 
 from aif360 import datasets, algorithms
 from aif360.algorithms import inprocessing
-from art.classifiers import Classifier
 import tensorflow as tf
 
 __author__ = 'Distil'
@@ -48,7 +47,7 @@ class Hyperparams(hyperparams.Hyperparams):
 class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
     '''
         Primitive that applies one of three in-processing algorithm to training data while fitting a learning algorithm. Algorithm
-        options are 'Adversarial_Debiasing', 'ART_Classifier', and 'Prejudice_Remover'.
+        options are 'Adversarial_Debiasing' and 'Prejudice_Remover'.
     '''
     metadata = metadata_base.PrimitiveMetadata({
         # Simply an UUID generated once and fixed forever. Generated using "uuid.uuid4()".
@@ -139,16 +138,11 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
             # 2. assume categorical columns have been converted to unique numeric values
             # 3. assume the label column is numeric 
         self.unfavorable_label = 0. if self.hyperparams['favorable_label'] == 1. else 1.
-        if self.hyperparams['algorithm'] == 'Adversarial_Debiasing' or self.hyperparams['algorithm'] == 'Prejudice_Remover':
-            self.train_dataset = datasets.BinaryLabelDataset(df = inputs[self.attribute_names + self.label_names],
-                                                    label_names = self.label_names,
-                                                    protected_attribute_names = self.protected_attributes,
-                                                    favorable_label=self.hyperparams['favorable_label'],
-                                                    unfavorable_label=self.unfavorable_label)
-        else:
-            self.train_dataset = datasets.Dataset(df = inputs[self.attribute_names],
-                                            label_names = self.label_names,
-                                            protected_attribute_names = self.protected_attributes)
+        self.train_dataset = datasets.BinaryLabelDataset(df = inputs[self.attribute_names + self.label_names],
+                                                label_names = self.label_names,
+                                                protected_attribute_names = self.protected_attributes,
+                                                favorable_label=self.hyperparams['favorable_label'],
+                                                unfavorable_label=self.unfavorable_label)
 
         # apply pre-processing algorithm
         if self.hyperparams['algorithm'] == 'Adversarial_Debiasing':
@@ -194,16 +188,12 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
         """
         # transfrom test dataframe to IBM 360 compliant dataset
         inputs[self.label_names] = self.train_dataset.convert_to_dataframe()[0][self.label_names].values[:inputs.shape[0]].astype(int)
-        if self.hyperparams['algorithm'] == 'Adversarial_Debiasing' or self.hyperparams['algorithm'] == 'Prejudice_Remover':
-            test_dataset = datasets.BinaryLabelDataset(df = inputs[self.attribute_names + self.label_names],
-                                                    label_names = self.label_names,
-                                                    protected_attribute_names = self.protected_attributes,
-                                                    favorable_label=self.hyperparams['favorable_label'],
-                                                    unfavorable_label=self.unfavorable_label)
-        else:
-            test_dataset = datasets.Dataset(df = inputs[self.attribute_names],
-                                            label_names = self.label_names,
-                                            protected_attribute_names = self.protected_attributes)
+        test_dataset = datasets.BinaryLabelDataset(df = inputs[self.attribute_names + self.label_names],
+                                                label_names = self.label_names,
+                                                protected_attribute_names = self.protected_attributes,
+                                                favorable_label=self.hyperparams['favorable_label'],
+                                                unfavorable_label=self.unfavorable_label)
+
         transformed_dataset = self.clf.predict(test_dataset)
         
         # transform IBM dataset back to D3M dataset

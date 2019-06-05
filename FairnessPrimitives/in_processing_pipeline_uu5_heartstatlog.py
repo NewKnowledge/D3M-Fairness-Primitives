@@ -44,17 +44,10 @@ step_5 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_augmen
 step_5.add_argument(name='inputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.4.produce')
 step_5.add_argument(name='outputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.4.produce')
 step_5.add_output('produce')
-step_5.add_hyperparameter(name='algorithm', argument_type=ArgumentType.VALUE,data='Adversarial_Debiasing')
+step_5.add_hyperparameter(name='algorithm', argument_type=ArgumentType.VALUE,data='Prejudice_Remover')
 step_5.add_hyperparameter(name='protected_attribute_cols', argument_type=ArgumentType.VALUE,data=[3])
 step_5.add_hyperparameter(name='favorable_label', argument_type=ArgumentType.VALUE,data=0.)
 pipeline_description.add_step(step_5)
-
-# Step 7: construct output
-#step_6 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_transformation.construct_predictions.DataFrameCommon'))
-#step_6.add_argument(name='inputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.5.produce')
-#step_6.add_argument(name='reference', argument_type=ArgumentType.CONTAINER, data_reference='steps.1.produce')
-#step_6.add_output('produce')
-#pipeline_description.add_step(step_6)
 
 # Final Output
 pipeline_description.add_output(name='output predictions', data_reference='steps.5.produce')
