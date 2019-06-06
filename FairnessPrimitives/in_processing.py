@@ -101,7 +101,7 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
 
     def set_training_data(self, *, inputs: Inputs, outputs: Outputs) -> None:
         '''
-        Sets primitive's training data by applying pre-processing algorithm
+        Sets primitive's training data
 
         Parameters
         ----------
@@ -148,15 +148,15 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
 
     def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
         """
-        Fit primitive using sklearn random forest on pre-processed training data
+        Fit primitive using adversarial debiasing algorithm
 
         Parameters
         ----------
-        inputs : D3M dataframe
+        inputs : None
 
         Returns
         ----------
-        Outputs : D3M dataframe unchanged
+        Outputs : None
         """
         
         self.clf = self.clf.fit(self.train_dataset)
@@ -164,7 +164,7 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
 
     def produce(self, *, inputs: Inputs, timeout: float = None, iterations: int = None) -> CallResult[Outputs]:
         """
-        Produce predictions using sklearn random forest 
+        Produce predictions using fit adversarial debiasing algorithm
 
         Parameters
         ----------
@@ -172,7 +172,7 @@ class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
 
         Returns
         ----------
-        Outputs : predictions from sklearn random forest which was fit on pre-processed training data
+        Outputs : D3M dataframe -> predictions from fit debiasing algorithm
             
         """
         # transfrom test dataframe to IBM 360 compliant dataset

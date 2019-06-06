@@ -11,7 +11,7 @@ setup(name='FairnessPrimitives',
         'd3m.primitives': [
             'data_preprocessing.data_conversion.FairnessPreProcessing = FairnessPrimitives:FairnessPreProcessing',
             'data_augmentation.data_conversion.FairnessInProcessing = FairnessPrimitives:FairnessInProcessing',
-            'data_augmentation.data_conversion.FairnessPostProcessing = FairnessPrimitives:post_processing',
+            'data_augmentation.data_conversion.FairnessPostProcessing = FairnessPrimitives:FairnessPostProcessing',
        ],
     },
 )
