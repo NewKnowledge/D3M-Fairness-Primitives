@@ -3,7 +3,7 @@ import os.path
 import pandas
 from typing import List
 
-from d3m.primitive_interfaces.base import CallResult, PrimitiveBase
+from d3m.primitive_interfaces.base import CallResult, TransformerPrimitiveBase
 
 from d3m import container, utils, exceptions
 from d3m.container import DataFrame as d3m_DataFrame
@@ -43,7 +43,7 @@ class Hyperparams(hyperparams.Hyperparams):
     )
     pass
 
-class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
+class FairnessPreProcessing(TransformerPrimitiveBase[Inputs, Outputs, Hyperparams]):
     '''
         Primitive that applies one of three pre-processing algorithm to training data before fitting a learning algorithm. Algorithm
         options are 'Disparate_Impact_Remover', 'Learning_Fair_Representations', and 'Reweighing'.
@@ -87,34 +87,32 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
     def __init__(self, *, hyperparams: Hyperparams, random_seed: int = 0)-> None:
         super().__init__(hyperparams=hyperparams, random_seed=random_seed)
 
-        self.attributes = None
-        self.targets = None
-        self.values = None
-        self.clf = None
-
-    def get_params(self) -> Params:
-        return self._params
-
-    def set_params(self, *, params:Params) -> None:
-        self.params = params
-
-    def set_training_data(self, *, inputs: Inputs, outputs: Outputs) -> None:
-        '''
-        Sets primitive's training data by applying pre-processing algorithm
+    def produce(self, *, inputs: Inputs, timeout: float = None, iterations: int = None) -> CallResult[Outputs]:
+        """
+        Produce predictions using sklearn random forest 
 
         Parameters
         ----------
-        inputs : features
-        outputs : labels
-        '''
-                                                
+        inputs : D3M dataframe
+
+        Returns
+        ----------
+        Outputs : D3M dataframe after pre-processing algorithm has been applied
+            
+        """
+
         # only select attributes from training data
-        self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
-        if not len(self.targets):
-            self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
-        if not len(self.targets):
-            self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/SuggestedTarget')
-        label_names = [list(inputs)[t] for t in self.targets]
+        targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
+        if not len(targets):
+            targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
+        if not len(targets):
+            targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/SuggestedTarget')
+        label_names = [list(inputs)[t] for t in targets]
+
+        if len(targets) == 1:
+            target_values = set(df[label_names[0]].values)
+            if target_values == '' or numpy.isnan(target_values) is True:
+                return CallResult(inputs)
         
         # calculate protected attributes and priveleged data
         protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
@@ -127,7 +125,6 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         # mark attributes that are not priveleged data
         attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
         priveleged_data = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrivilegedData')
-        self.attributes = list(set(attributes) - set(priveleged_data))
         
         # drop index from training data
         inputs = inputs.drop(columns=idx)
@@ -159,39 +156,5 @@ class FairnessPreProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams])
         df = transformed_dataset.convert_to_dataframe()[0].drop(columns = label_names)
         df = d3m_DataFrame(pandas.concat([index.reset_index(drop=True), inputs[label_names].reset_index(drop = True), df.reset_index(drop=True)], axis = 1))
         df.metadata = inputs.metadata
-        self.values = df
-
-    def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
-        """
-        Fit primitive using sklearn random forest on pre-processed training data
-
-        Parameters
-        ----------
-        inputs : D3M dataframe
-
-        Returns
-        ----------
-        Outputs : D3M dataframe unchanged
-        """
-        
-        hp_class = random_forest.RandomForestClassifierPrimitive.metadata.query()['primitive_code']['class_type_arguments']['Hyperparams'] 
-        hp=hp_class.defaults().replace({'use_inputs_columns': self.attributes, 'use_outputs_columns': self.targets})
-        self.clf = random_forest.RandomForestClassifierPrimitive(hyperparams=hp)
-        self.clf.set_training_data(inputs = self.values, outputs = self.values)
-        return self.clf.fit()
-
-    def produce(self, *, inputs: Inputs, timeout: float = None, iterations: int = None) -> CallResult[Outputs]:
-        """
-        Produce predictions using sklearn random forest 
-
-        Parameters
-        ----------
-        inputs : D3M dataframe
-
-        Returns
-        ----------
-        Outputs : predictions from sklearn random forest which was fit on pre-processed training data
-            
-        """
-        return self.clf.produce(inputs = inputs)
+        return CallResult(df)
 

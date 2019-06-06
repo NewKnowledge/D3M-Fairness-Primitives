@@ -42,12 +42,20 @@ pipeline_description.add_step(step_4)
 # Step 5: Fairness pre-processing Distil
 step_5 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_preprocessing.data_conversion.FairnessPreProcessing'))
 step_5.add_argument(name='inputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.4.produce')
-step_5.add_argument(name='outputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.4.produce')
 step_5.add_output('produce')
 step_5.add_hyperparameter(name='algorithm', argument_type=ArgumentType.VALUE,data='Disparate_Impact_Remover')
 step_5.add_hyperparameter(name='protected_attribute_cols', argument_type=ArgumentType.VALUE,data=[3])
 step_5.add_hyperparameter(name='favorable_label', argument_type=ArgumentType.VALUE,data=0.)
 pipeline_description.add_step(step_5)
+
+# Step 6: Random Forest classifier
+step_6 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.classification.random_forest.SKlearn'))
+step_6.add_argument(name='inputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.3.produce')
+step_6.add_argument(name='outputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.3.produce')
+step_6.add_output('produce')
+step_6.add_hyperparameter(name='use_inputs_columns', argument_type=ArgumentType.VALUE,data=[2, 3, 4, 5, 6, 7])
+step_6.add_hyperparameter(name='use_outputs_columns', argument_type=ArgumentType.VALUE,data=[1])
+pipeline_description.add_step(step_4)
 
 # Step 7: construct output
 step_6 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_transformation.construct_predictions.DataFrameCommon'))
