@@ -111,8 +111,8 @@ class FairnessPreProcessing(TransformerPrimitiveBase[Inputs, Outputs, Hyperparam
         label_names = [list(inputs)[t] for t in targets]
 
         if len(targets) == 1:
-            target_values = set(df[label_names[0]].values)
-            if target_values == '' or numpy.isnan(target_values) is True:
+            target_values = set(inputs[label_names[0]].values)
+            if target_values == set(('',)) or target_values == set((float('NaN'),)):
                 return CallResult(inputs)
         
         # calculate protected attributes and priveleged data
@@ -123,13 +123,9 @@ class FairnessPreProcessing(TransformerPrimitiveBase[Inputs, Outputs, Hyperparam
         idx = [list(inputs)[i] for i in idx]
         index = inputs[idx]
         
-        # mark attributes that are not priveleged data
-        attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
-        priveleged_data = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrivilegedData')
-        
         # drop index from training data
         inputs = inputs.drop(columns=idx)
-
+        
         # transfrom dataframe to IBM 360 compliant dataset
             # 1. assume datacleaning primitive has been applied so there are no NAs
             # 2. assume categorical columns have been converted to unique numeric values
