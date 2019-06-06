@@ -49,13 +49,13 @@ step_5.add_hyperparameter(name='favorable_label', argument_type=ArgumentType.VAL
 pipeline_description.add_step(step_5)
 
 # Step 6: Random Forest classifier
-step_6 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.classification.random_forest.DataFrameCommon'))
+step_6 = PrimitiveStep(pritmitive=index.get_primitive('d3m.primitives.classification.random_forest.DataFrameCommon'))
 step_6.add_argument(name='inputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.4.produce')
 step_6.add_argument(name='outputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.4.produce')
 step_6.add_output('produce')
 step_6.add_hyperparameter(name='use_inputs_columns', argument_type=ArgumentType.VALUE,data=[2, 3, 4, 5, 6, 7])
 step_6.add_hyperparameter(name='use_outputs_columns', argument_type=ArgumentType.VALUE,data=[1])
-pipeline_description.add_step(step_4)
+pipeline_description.add_step(step_6)
 
 # Step 7: construct output
 step_7 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_transformation.construct_predictions.DataFrameCommon'))
