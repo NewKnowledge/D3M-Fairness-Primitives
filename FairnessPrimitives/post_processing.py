@@ -41,6 +41,10 @@ class Hyperparams(hyperparams.Hyperparams):
         description='label value which is considered favorable (i.e. positive) in the binary label case',
         semantic_types=['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
     )
+    cost_constraint = hyperparams.Enumeration(default = 'weighted', 
+        semantic_types = ['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
+        values = ['weighted', 'fpr', 'fnr'],
+        description = 'the error rate that determines the constraint for Calibrated Equality of Odds algorithm')
     pass
 
 class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
@@ -87,10 +91,14 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
 
     def __init__(self, *, hyperparams: Hyperparams, random_seed: int = 0)-> None:
         super().__init__(hyperparams=hyperparams, random_seed=random_seed)
-
-        self.attributes = None
-        self.targets = None
-        self.values = None
+        
+        self.label_names = None
+        self.protected_attributes = None
+        self.idx = None
+        self.attribute_names = None
+        self.unfavorable_label = None
+        self.train_x = None
+        self.train_y = None
         self.clf = None
 
     def get_params(self) -> Params:
@@ -108,86 +116,83 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
         inputs : dataset containing predicted labels
         outputs : dataset containing true labels
         '''
-
-        print(list(inputs), file = sys.__stdout__)
-        print(list(out), file = sys.__stdout__)
                                                 
-        # only select attributes from training data
-        self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
-        if not len(self.targets):
-            self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
-        if not len(self.targets):
-            self.targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/SuggestedTarget')
-        label_names = [list(inputs)[t] for t in self.targets]
+        targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
+        if not len(targets):
+            targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
+        if not len(targets):
+            targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/SuggestedTarget')
+        self.label_names = [list(inputs)[t] for t in targets]
         
-        # calculate protected attributes and privel=
-        protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
+        # calculate protected attributes 
+        self.protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
 
         # save index and metadata
-        idx = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrimaryKey')
-        idx = [list(inputs)[i] for i in idx]
-        index = inputs[idx]
+        self.idx = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrimaryKey')
+        self.idx = [list(inputs)[i] for i in self.idx]
+        index = inputs[self.idx]
         
         # mark attributes that are not priveleged data
         attributes = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/Attribute')
         priveleged_data = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrivilegedData')
-        self.attributes = list(set(attributes) - set(priveleged_data))
-        attribute_names = [list(inputs)[a] for a in self.attributes]
+        attributes = list(set(attributes) - set(priveleged_data))
+        self.attribute_names = [list(inputs)[a] for a in attributes]
         
         # drop index from training data
-        inputs = inputs.drop(columns=idx)
+        inputs = inputs.drop(columns=self.idx)
+        outputs = outputs.drop(columns=self.idx)
 
         # transfrom dataframe to IBM 360 compliant dataset
             # 1. assume datacleaning primitive has been applied so there are no NAs
             # 2. assume categorical columns have been converted to unique numeric values
             # 3. assume the label column is numeric 
-        unfavorable_label = 0. if self.hyperparams['favorable_label'] == 1. else 1.
-        ibm_dataset = datasets.BinaryLabelDataset(df = inputs,
-                                                label_names = label_names,
-                                                protected_attribute_names = protected_attributes,
+        self.unfavorable_label = 0. if self.hyperparams['favorable_label'] == 1. else 1.
+        self.train_x = datasets.BinaryLabelDataset(df = inputs[self.attribute_names + self.label_names],
+                                                label_names = self.label_names,
+                                                protected_attribute_names = self.protected_attributes,
                                                 favorable_label=self.hyperparams['favorable_label'],
-                                                unfavorable_label=unfavorable_label)
+                                                unfavorable_label=self.unfavorable_label)
+        self.train_y = datasets.BinaryLabelDataset(df = outputs[self.attribute_names + self.label_names],
+                                                label_names = self.label_names,
+                                                protected_attribute_names = self.protected_attributes,
+                                                favorable_label=self.hyperparams['favorable_label'],
+                                                unfavorable_label=self.unfavorable_label)
 
         # apply pre-processing algorithm
-        if self.hyperparams['algorithm'] == 'Disparate_Impact_Remover':
-            transformed_dataset = preprocessing.DisparateImpactRemover().fit_transform(ibm_dataset)
+        if self.hyperparams['algorithm'] == 'Calibrated_Equality_of_Odds':
+            self.clf = postprocessing.CalibratedEqOddsPostprocessing(unprivileged_groups = [{self.protected_attributes[0]: self.train_x.unprivileged_protected_attributes}], 
+                                                                    privileged_groups = [{self.protected_attributes[0]: self.train_x..privileged_protected_attributes}], 
+                                                                    cost_constraint = self.hyperparams['cost_constraint'], seed = self.random_seed)
+        '''
         elif self.hyperparams['algorithm'] == 'Learning_Fair_Representations':
-            transformed_dataset = preprocessing.LFR(unprivileged_groups = [{protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}],
-                                                                privileged_groups = [{protected_attributes[0]: ibm_dataset.privileged_protected_attributes}]).fit_transform(ibm_dataset)
+            transformed_dataset = preprocessing.LFR(unprivileged_groups = [{self.protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}],
+                                                                privileged_groups = [{self.protected_attributes[0]: ibm_dataset.privileged_protected_attributes}]).fit_transform(ibm_dataset)
         else: 
-            privileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(protected_attributes, ibm_dataset.privileged_protected_attributes)]
-            unprivileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(protected_attributes, ibm_dataset.unprivileged_protected_attributes)]
+            privileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(self.protected_attributes, ibm_dataset.privileged_protected_attributes)]
+            unprivileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(self.protected_attributes, ibm_dataset.unprivileged_protected_attributes)]
             transformed_dataset = preprocessing.Reweighing(unprivileged_groups = unprivileged_groups, privileged_groups = privileged_groups).fit_transform(ibm_dataset)
             # TODO: incorporate instance weights fro transformed_dataset.instance_weights into classifier
-
-        # transform IBM dataset back to D3M dataset
-        df = transformed_dataset.convert_to_dataframe()[0].drop(columns = label_names)
-        df = d3m_DataFrame(pandas.concat([index.reset_index(drop=True), inputs[label_names].reset_index(drop = True), df.reset_index(drop=True)], axis = 1))
-        df.metadata = inputs.metadata
-        self.values = df
+        '''
 
     def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
         """
-        Fit primitive using sklearn random forest on pre-processed training data
+        Fit primitive using post-processing algorithm
 
         Parameters
         ----------
-        inputs : D3M dataframe
+        inputs : None
 
         Returns
         ----------
-        Outputs : D3M dataframe unchanged
+        Outputs : None
         """
         
-        hp_class = random_forest.RandomForestClassifierPrimitive.metadata.query()['primitive_code']['class_type_arguments']['Hyperparams'] 
-        hp=hp_class.defaults().replace({'use_inputs_columns': self.attributes, 'use_outputs_columns': self.targets})
-        self.clf = random_forest.RandomForestClassifierPrimitive(hyperparams=hp)
-        self.clf.set_training_data(inputs = self.values, outputs = self.values)
-        return self.clf.fit()
+        self.clf = self.clf.fit(self.train_y, self.train_x)
+        return CallResult(None)
 
     def produce(self, *, inputs: Inputs, timeout: float = None, iterations: int = None) -> CallResult[Outputs]:
         """
-        Produce predictions using sklearn random forest 
+        Produce edited predictions using fit post-processing debiasing algorithm
 
         Parameters
         ----------
@@ -195,8 +200,23 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
 
         Returns
         ----------
-        Outputs : predictions from sklearn random forest which was fit on pre-processed training data
+        Outputs : D3M dataframe -> predictions from fit post-processing algorithm
             
         """
-        return self.clf.produce(inputs = inputs)
+        # transfrom test dataframe to IBM 360 compliant dataset
+        test_dataset = datasets.BinaryLabelDataset(df = inputs[self.attribute_names + self.label_names],
+                                                label_names = self.label_names,
+                                                protected_attribute_names = self.protected_attributes,
+                                                favorable_label=self.hyperparams['favorable_label'],
+                                                unfavorable_label=self.unfavorable_label)
+
+        transformed_dataset = self.clf.predict(test_dataset)
+        
+        # transform IBM dataset back to D3M dataset
+        df = transformed_dataset.convert_to_dataframe()[0][self.label_names].astype(int)
+        df = d3m_DataFrame(pandas.concat([inputs[self.idx].reset_index(drop=True), df.reset_index(drop=True)], axis = 1))
+        df.metadata = df.metadata.update((metadata_base.ALL_ELEMENTS, 0), inputs.metadata.query_column(0))
+        df.metadata = df.metadata.update((metadata_base.ALL_ELEMENTS, 1), inputs.metadata.query_column(1))
+        print(df.head(), file = sys.__stdout__)
+        return CallResult(df)
 
