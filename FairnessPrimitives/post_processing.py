@@ -47,8 +47,22 @@ class Hyperparams(hyperparams.Hyperparams):
         description = 'the error rate that determines the constraint for Calibrated Equality of Odds algorithm')
     metric_name = hyperparams.Enumeration(default = 'Statistical parity difference', 
         semantic_types = ['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
-        values = ['Statistical parity difference', 'Average odds difference', 'Equal opportunity difference'],
+        values = ['Statistical parity difference', 'Average odds difference', '`rel`],
         description = 'the metric that determines the constraint for Reject Option Classification algorithm')
+    low_class_threshold = hyperparams.Bounded[float](
+        lower=0.,
+        upper=1., 
+        default=0.01,
+        description='smallest classification threshold to use in the optimization (applies to Reject Option Classification algorithm',
+        semantic_types=['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
+    )
+    high_class_threshold = hyperparams.Bounded[float](
+        lower=0.,
+        upper=1., 
+        default=0.99,
+        description='highest classification threshold to use in the optimization (applies to Reject Option Classification algorithm',
+        semantic_types=['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
+    )
     pass
 
 class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
@@ -179,7 +193,9 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
         else: 
             self.clf = postprocessing.RejectOptionClassification(unprivileged_groups = [{self.protected_attributes[0]: self.train_x.unprivileged_protected_attributes}], 
                                                                     privileged_groups = [{self.protected_attributes[0]: self.train_x.privileged_protected_attributes}], 
-                                                                    metric_name = self.hyperparams['metric_name'])
+                                                                    metric_name = self.hyperparams['metric_name'],
+                                                                    low_class_thres = self.hyperparams['low_class_threshold'],
+                                                                    high_class_thres = self.hyperparams['high_class_threshold'])
         
 
     def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
