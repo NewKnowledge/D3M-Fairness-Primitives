@@ -172,12 +172,12 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
                                                                     cost_constraint = self.hyperparams['cost_constraint'], seed = self.random_seed)
 
         elif self.hyperparams['algorithm'] == 'Equality_of_Odds':
-            self.clf = postprocessing.CalibratedEqOddsPostprocessing(unprivileged_groups = [{self.protected_attributes[0]: self.train_x.unprivileged_protected_attributes}], 
+            self.clf = postprocessing.EqOddsPostprocessing(unprivileged_groups = [{self.protected_attributes[0]: self.train_x.unprivileged_protected_attributes}], 
                                                                     privileged_groups = [{self.protected_attributes[0]: self.train_x..privileged_protected_attributes}], 
                                                                     seed = self.random_seed)
         
         else: 
-            self.clf = postprocessing.CalibratedEqOddsPostprocessing(unprivileged_groups = [{self.protected_attributes[0]: self.train_x.unprivileged_protected_attributes}], 
+            self.clf = postprocessing.RejectOptionClassification(unprivileged_groups = [{self.protected_attributes[0]: self.train_x.unprivileged_protected_attributes}], 
                                                                     privileged_groups = [{self.protected_attributes[0]: self.train_x..privileged_protected_attributes}], 
                                                                     metric_name = self.hyperparams['metric_name'])
         
