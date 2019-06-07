@@ -194,8 +194,8 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
             self.clf = postprocessing.RejectOptionClassification(unprivileged_groups = [{self.protected_attributes[0]: self.train_x.unprivileged_protected_attributes}], 
                                                                     privileged_groups = [{self.protected_attributes[0]: self.train_x.privileged_protected_attributes}], 
                                                                     metric_name = self.hyperparams['metric_name'],
-                                                                    low_class_thres = self.hyperparams['low_class_threshold'],
-                                                                    high_class_thres = self.hyperparams['high_class_threshold'])
+                                                                    low_class_thresh = self.hyperparams['low_class_threshold'],
+                                                                    high_class_thresh = self.hyperparams['high_class_threshold'])
         
 
     def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
