@@ -116,7 +116,11 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
         inputs : dataset containing predicted labels
         outputs : dataset containing true labels
         '''
-                                                
+
+        # drop duplicated df columns (residual of some classifiers)
+        inputs = inputs.loc[:, ~inputs.columns.duplicated()]
+        outputs = outputs.loc[:, ~outputs.columns.duplicated()]
+
         targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
         if not len(targets):
             targets = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/TrueTarget')
@@ -126,7 +130,7 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
         
         # calculate protected attributes 
         self.protected_attributes = [list(inputs)[c] for c in self.hyperparams['protected_attribute_cols']]
-
+        
         # save index and metadata
         self.idx = inputs.metadata.get_columns_with_semantic_type('https://metadata.datadrivendiscovery.org/types/PrimaryKey')
         self.idx = [list(inputs)[i] for i in self.idx]
@@ -139,9 +143,8 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
         self.attribute_names = [list(inputs)[a] for a in attributes]
         
         # drop index from training data
-        inputs = inputs.drop(columns=self.idx)
-        outputs = outputs.drop(columns=self.idx)
-
+        #inputs = inputs.drop(columns=self.idx)
+        #outputs = outputs.drop(columns=self.idx)
         # transfrom dataframe to IBM 360 compliant dataset
             # 1. assume datacleaning primitive has been applied so there are no NAs
             # 2. assume categorical columns have been converted to unique numeric values
@@ -161,7 +164,7 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
         # apply pre-processing algorithm
         if self.hyperparams['algorithm'] == 'Calibrated_Equality_of_Odds':
             self.clf = postprocessing.CalibratedEqOddsPostprocessing(unprivileged_groups = [{self.protected_attributes[0]: self.train_x.unprivileged_protected_attributes}], 
-                                                                    privileged_groups = [{self.protected_attributes[0]: self.train_x..privileged_protected_attributes}], 
+                                                                    privileged_groups = [{self.protected_attributes[0]: self.train_x.privileged_protected_attributes}], 
                                                                     cost_constraint = self.hyperparams['cost_constraint'], seed = self.random_seed)
         '''
         elif self.hyperparams['algorithm'] == 'Learning_Fair_Representations':
@@ -203,6 +206,10 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
         Outputs : D3M dataframe -> predictions from fit post-processing algorithm
             
         """
+        # drop duplicated df columns (residual of some classifiers)
+        inputs = inputs.loc[:, ~inputs.columns.duplicated()]
+        inputs[self.label_names] = self.train_x.convert_to_dataframe()[0][self.label_names].values[:inputs.shape[0]].astype(int)
+
         # transfrom test dataframe to IBM 360 compliant dataset
         test_dataset = datasets.BinaryLabelDataset(df = inputs[self.attribute_names + self.label_names],
                                                 label_names = self.label_names,
@@ -217,6 +224,5 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
         df = d3m_DataFrame(pandas.concat([inputs[self.idx].reset_index(drop=True), df.reset_index(drop=True)], axis = 1))
         df.metadata = df.metadata.update((metadata_base.ALL_ELEMENTS, 0), inputs.metadata.query_column(0))
         df.metadata = df.metadata.update((metadata_base.ALL_ELEMENTS, 1), inputs.metadata.query_column(1))
-        print(df.head(), file = sys.__stdout__)
         return CallResult(df)
 

@@ -39,7 +39,7 @@ step_4.add_hyperparameter(name='return_result', argument_type=ArgumentType.VALUE
 step_4.add_hyperparameter(name='use_semantic_types', argument_type=ArgumentType.VALUE,data=True)
 pipeline_description.add_step(step_4)
 
-# Step 6: Random Forest classifier
+# Step 5: Random Forest classifier
 step_5 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.classification.random_forest.DataFrameCommon'))
 step_5.add_argument(name='inputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.3.produce')
 step_5.add_argument(name='outputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.3.produce')
@@ -48,8 +48,8 @@ step_5.add_hyperparameter(name='use_inputs_columns', argument_type=ArgumentType.
 step_5.add_hyperparameter(name='use_outputs_columns', argument_type=ArgumentType.VALUE,data=[1])
 pipeline_description.add_step(step_5)
 
-# Step 5: Fairness post-processing Distil
-step_6 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_preprocessing.data_conversion.FairnessPreProcessing'))
+# Step 6: Fairness post-processing Distil
+step_6 = PrimitiveStep(primitive=index.get_primitive('d3m.primitives.data_augmentation.data_conversion.FairnessPostProcessing'))
 step_6.add_argument(name='inputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.5.produce')
 step_6.add_argument(name='outputs', argument_type=ArgumentType.CONTAINER, data_reference='steps.5.produce')
 step_6.add_output('produce')
@@ -63,4 +63,4 @@ pipeline_description.add_output(name='output predictions', data_reference='steps
 
 # Output to JSON
 with open('pipeline.json', 'w') as outfile:
-    outfile.write(pipeline_description.to_json())
+   outfile.write(pipeline_description.to_json())
