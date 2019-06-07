@@ -42,9 +42,10 @@ class Hyperparams(hyperparams.Hyperparams):
 
 class FairnessInProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
     '''
-        Primitive that applies an in-processing algorithm to training data while fitting a learning algorithm. Algorithm
-            is 'Adversarial_Debiasing', which earns a classifier to maximize prediction accuracy and simultaneously reduce
-            an adversary’s ability to determine the protected attribute from the predictions.
+        Primitive that applies an in-processing algorithm to training data while fitting a learning algorithm. 
+        Algorithm is 'Adversarial_Debiasing', which learns a classifier (tf nn based) that maximizes 
+        prediction accuracy, while simultaneously reducing an adversary’s ability to determine the protected 
+        attribute from the predictions.
     '''
     metadata = metadata_base.PrimitiveMetadata({
         # Simply an UUID generated once and fixed forever. Generated using "uuid.uuid4()".

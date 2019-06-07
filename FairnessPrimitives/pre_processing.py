@@ -90,7 +90,9 @@ class FairnessPreProcessing(TransformerPrimitiveBase[Inputs, Outputs, Hyperparam
 
     def produce(self, *, inputs: Inputs, timeout: float = None, iterations: int = None) -> CallResult[Outputs]:
         """
-        Produce predictions using sklearn random forest 
+        Produce pre-processed D3M Dataframe according to some distance / fairness / representation / distribution
+        constraint defined by the algorithm. This pre-processing is only applied to training data and 
+        not to testing data.
 
         Parameters
         ----------

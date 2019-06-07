@@ -67,9 +67,7 @@ class Hyperparams(hyperparams.Hyperparams):
 
 class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
     '''
-        Primitive that applies one of three post-processing algorithm after a learning algorithm has been fit to change 
-        the output labels according to some fairness objective or criteria. Algorithm options are 'Calibrated_Equality_of_Odds', 
-        'Equality_of_Odds', and 'Reject_Option_Classification'.
+        Primitive that applies one of three post-processing algorithms after a classifier has been fit. This changes the predicted labels to achieve fairness according to some definition. The algorithm options (that is - fairness definition options) are *Calibrated_Equality_of_Odds*, *Equality_of_Odds*, and *Reject_Option_Classification*. The algorithm *Calibrated_Equality_of_Odds* can be modified by the hyperparameter *cost_constraint* (options = *weighted*, *fpr*, *fnr*). Additionally, the algorithm *Reject_Option_Classification* can be modified by the hyperparameters *metric_name* (options = *Statistical parity difference*, *Average odds difference*, *Equal opportunity difference*), *low_class_threshold* and *high_class_threshold*
     '''
     metadata = metadata_base.PrimitiveMetadata({
         # Simply an UUID generated once and fixed forever. Generated using "uuid.uuid4()".
