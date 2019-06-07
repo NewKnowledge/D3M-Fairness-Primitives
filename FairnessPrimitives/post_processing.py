@@ -47,7 +47,7 @@ class Hyperparams(hyperparams.Hyperparams):
         description = 'the error rate that determines the constraint for Calibrated Equality of Odds algorithm')
     metric_name = hyperparams.Enumeration(default = 'Statistical parity difference', 
         semantic_types = ['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
-        values = ['Statistical parity difference', 'Average odds difference', '`rel`],
+        values = ['Statistical parity difference', 'Average odds difference', 'Equal opportunity difference'],
         description = 'the metric that determines the constraint for Reject Option Classification algorithm')
     low_class_threshold = hyperparams.Bounded[float](
         lower=0.,
