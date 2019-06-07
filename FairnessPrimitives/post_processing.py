@@ -45,6 +45,10 @@ class Hyperparams(hyperparams.Hyperparams):
         semantic_types = ['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
         values = ['weighted', 'fpr', 'fnr'],
         description = 'the error rate that determines the constraint for Calibrated Equality of Odds algorithm')
+    metric_name = hyperparams.Enumeration(default = 'Statistical parity difference', 
+        semantic_types = ['https://metadata.datadrivendiscovery.org/types/ControlParameter'],
+        values = ['Statistical parity difference', 'Average odds difference', 'Equal opportunity difference'],
+        description = 'the metric that determines the constraint for Reject Option Classification algorithm')
     pass
 
 class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]):
@@ -163,16 +167,17 @@ class FairnessPostProcessing(PrimitiveBase[Inputs, Outputs, Params, Hyperparams]
             self.clf = postprocessing.CalibratedEqOddsPostprocessing(unprivileged_groups = [{self.protected_attributes[0]: self.train_x.unprivileged_protected_attributes}], 
                                                                     privileged_groups = [{self.protected_attributes[0]: self.train_x..privileged_protected_attributes}], 
                                                                     cost_constraint = self.hyperparams['cost_constraint'], seed = self.random_seed)
-        '''
-        elif self.hyperparams['algorithm'] == 'Learning_Fair_Representations':
-            transformed_dataset = preprocessing.LFR(unprivileged_groups = [{self.protected_attributes[0]: ibm_dataset.unprivileged_protected_attributes}],
-                                                                privileged_groups = [{self.protected_attributes[0]: ibm_dataset.privileged_protected_attributes}]).fit_transform(ibm_dataset)
+
+        elif self.hyperparams['algorithm'] == 'Equality_of_Odds':
+            self.clf = postprocessing.CalibratedEqOddsPostprocessing(unprivileged_groups = [{self.protected_attributes[0]: self.train_x.unprivileged_protected_attributes}], 
+                                                                    privileged_groups = [{self.protected_attributes[0]: self.train_x..privileged_protected_attributes}], 
+                                                                    seed = self.random_seed)
+        
         else: 
-            privileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(self.protected_attributes, ibm_dataset.privileged_protected_attributes)]
-            unprivileged_groups = [{p_attr: p_attr_val} for (p_attr, p_attr_val) in zip(self.protected_attributes, ibm_dataset.unprivileged_protected_attributes)]
-            transformed_dataset = preprocessing.Reweighing(unprivileged_groups = unprivileged_groups, privileged_groups = privileged_groups).fit_transform(ibm_dataset)
-            # TODO: incorporate instance weights fro transformed_dataset.instance_weights into classifier
-        '''
+            self.clf = postprocessing.CalibratedEqOddsPostprocessing(unprivileged_groups = [{self.protected_attributes[0]: self.train_x.unprivileged_protected_attributes}], 
+                                                                    privileged_groups = [{self.protected_attributes[0]: self.train_x..privileged_protected_attributes}], 
+                                                                    metric_name = self.hyperparams['metric_name'])
+        
 
     def fit(self, *, timeout: float = None, iterations: int = None) -> CallResult[None]:
         """
