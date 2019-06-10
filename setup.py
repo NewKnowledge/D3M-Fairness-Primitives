@@ -6,6 +6,7 @@ setup(name='FairnessPrimitives',
     packages=['FairnessPrimitives'],
     install_requires=["aif360 @ git+https://github.com/NewKnowledge/AIF360@0b64efa87cefba89ac5a29f80c7eb885a80a1422#egg=aif360",
                     'tensorflow-gpu<=1.12.2',
+                    'numba'
                       ],
     entry_points = {
         'd3m.primitives': [
