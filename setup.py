@@ -4,9 +4,9 @@ setup(name='FairnessPrimitives',
     version='1.0.0',
     description='Pre-processing, in-processing, and post-processing algorithms wrapped for the D3M infrastructure',
     packages=['FairnessPrimitives'],
-    install_requires=["aif360 @ git+https://github.com/NewKnowledge/AIF360@0b64efa87cefba89ac5a29f80c7eb885a80a1422#egg=aif360",
-                    'tensorflow-gpu<=1.12.2',
-                    'numba'
+    install_requires=["aif360 @ git+https://github.com/NewKnowledge/AIF360.git@97cc0d45b33392d3d3fcadfd65c885b4b9fab6a2#egg=aif360",
+                    'tensorflow-gpu==2.0.0',
+                    'numba==0.46.0'
                       ],
     entry_points = {
         'd3m.primitives': [
